@@ -79,7 +79,9 @@ def main() -> int:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("outputs")
     api_key = _prime_api_key()
     problems = []
-    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "validation.md"):
+    # Validation reports name the hidden tests on purpose (they document which tests each
+    # check fails). They are not eval traces, and the hidden tests ship in the package anyway.
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and not p.name.startswith("validation")):
         changed = scrub_traces(path) if path.suffix == ".jsonl" else scrub_text(path)
         if changed:
             print(f"redacted: {path}")
