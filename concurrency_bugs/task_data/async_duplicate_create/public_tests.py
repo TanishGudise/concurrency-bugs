@@ -1,37 +1,58 @@
 import asyncio
 
-from registry import UserRegistry
+import pytest
+from accounts import ProfileCache, SignInService, UserRegistry
 
 
 class FakeDatabase:
     def __init__(self):
         self.created = []
 
-    async def create_user(self, name):
+    async def create_user(self, name, email=None):
         self.created.append(name)
-        return {"name": name, "row": len(self.created)}
+        return {"id": len(self.created), "name": name, "email": email}
+
+    async def load_profile(self, user_id):
+        return {"user_id": user_id, "theme": "dark"}
 
 
-def test_user_is_created_once_and_cached():
+class FakeDirectory:
+    async def name_for(self, email):
+        return email.split("@")[0]
+
+
+def make_service():
+    db = FakeDatabase()
+    registry = UserRegistry(db, FakeDirectory())
+    return db, registry, SignInService(registry, ProfileCache(db))
+
+
+def test_sign_in_by_name_then_email_reuses_the_user():
     async def main():
-        db = FakeDatabase()
-        registry = UserRegistry(db)
-        first = await registry.get_or_create("ada")
-        second = await registry.get_or_create("ada")
-        return db, first, second
+        db, registry, service = make_service()
+        first = await service.sign_in("Ada")
+        second = await service.sign_in("ada@example.com")
+        assert first.user is second.user
+        assert first.profile["theme"] == "dark"
+        return db.created
 
-    db, first, second = asyncio.run(main())
-    assert first is second
-    assert first["name"] == "ada"
-    assert db.created == ["ada"]
+    assert asyncio.run(main()) == ["ada"]
 
 
-def test_different_names_get_different_users():
+def test_different_users_are_different():
     async def main():
-        db = FakeDatabase()
-        registry = UserRegistry(db)
-        return db, await registry.get_or_create("ada"), await registry.get_or_create("bob")
+        db, registry, _ = make_service()
+        ada = await registry.get_or_create("ada")
+        bob = await registry.get_or_create("bob")
+        assert ada is not bob and len(registry) == 2
 
-    db, ada, bob = asyncio.run(main())
-    assert ada is not bob
-    assert db.created == ["ada", "bob"]
+    asyncio.run(main())
+
+
+def test_invalid_usernames_are_rejected():
+    async def main():
+        _, registry, _ = make_service()
+        with pytest.raises(ValueError):
+            await registry.get_or_create("  ")
+
+    asyncio.run(main())
