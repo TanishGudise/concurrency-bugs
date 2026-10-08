@@ -9,7 +9,7 @@ from fetcher import fetch_all
 
 pytestmark = pytest.mark.anyio
 
-STEP_TIMEOUT_S = 5
+STEP_TIMEOUT_S = 1.5
 URLS = [f"u{i}" for i in range(8)]
 
 

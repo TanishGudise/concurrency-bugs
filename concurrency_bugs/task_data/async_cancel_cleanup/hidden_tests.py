@@ -8,7 +8,7 @@ from db import Database
 
 pytestmark = pytest.mark.anyio
 
-STEP_TIMEOUT_S = 5
+STEP_TIMEOUT_S = 1.5
 POOL_SIZE = 2
 
 

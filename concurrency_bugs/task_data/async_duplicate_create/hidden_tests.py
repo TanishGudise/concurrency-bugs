@@ -12,7 +12,7 @@ from registry import UserRegistry
 
 pytestmark = pytest.mark.anyio
 
-STEP_TIMEOUT_S = 5
+STEP_TIMEOUT_S = 1.5
 
 
 @pytest.fixture
