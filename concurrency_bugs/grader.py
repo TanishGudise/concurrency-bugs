@@ -15,6 +15,7 @@ their own timeouts are failsafes far below the subprocess limit.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import re
 import signal
@@ -236,6 +237,18 @@ async def run_tests(
             except ProcessLookupError:
                 pass
             stdout, _ = await proc.communicate()
+        except asyncio.CancelledError:
+            # The runner gave up on this rollout (a timeout or shutdown on its side): kill the
+            # run now instead of leaving it to the per-test watchdog.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            # Bounded: wait() also waits for stdout to close, and a process that left the group
+            # can hold it open. The child watcher reaps pytest either way.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(proc.wait(), 1.0)
+            raise
         duration = time.monotonic() - start
         output = (stdout or b"").decode(errors="replace")[-4000:]
         tests = {} if timed_out else _parse_junit(junit)
